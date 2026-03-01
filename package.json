@@ -1,0 +1,19 @@
+{
+  "name": "weather-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "nuxt prepare",
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.11.4",
+    "nuxt": "^3.11.1"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  }
+}
