@@ -4,7 +4,6 @@
     <div class="bg-layer">
       <div class="bg-gradient" :class="theme.bg" />
       <canvas ref="canvasRef" class="particles-canvas" />
-      <!-- Lightning flash for thunderstorm -->
       <div v-if="isThunder" class="lightning-flash" />
     </div>
 
@@ -24,12 +23,24 @@
         <div class="topbar-right">
           <NavBar />
           <div class="clock glass">{{ currentTime }}</div>
-          <button class="btn-icon glass glass-hover" @click="fetchLocation" :disabled="locating" title="Detect location">
-            <svg v-if="!locating" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <!-- Unit toggle -->
+          <div class="unit-toggle glass">
+            <button :class="['unit-btn', tempUnit === 'C' ? 'unit-active' : '']" @click="tempUnit = 'C'" aria-label="Celsius">°C</button>
+            <button :class="['unit-btn', tempUnit === 'F' ? 'unit-active' : '']" @click="tempUnit = 'F'" aria-label="Fahrenheit">°F</button>
+          </div>
+          <button class="btn-icon glass glass-hover" @click="fetchLocation" :disabled="locating" title="Detect my location" aria-label="Detect my location">
+            <svg v-if="!locating" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
             </svg>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning" aria-hidden="true">
               <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+          <!-- Share button -->
+          <button v-if="weather" class="btn-icon glass glass-hover" @click="shareWeather" title="Share weather" aria-label="Share this weather">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
             </svg>
           </button>
         </div>
@@ -37,32 +48,46 @@
 
       <!-- SEARCH -->
       <div class="search-wrap anim-fade-up" style="animation-delay:.08s">
-        <form @submit.prevent="handleSearch" class="search-form glass">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="search-icon">
+        <form @submit.prevent="handleSearch" class="search-form glass" role="search">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="search-icon" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input v-model="searchQuery" type="text" placeholder="Search any city worldwide..."
-            class="search-input" @keydown.esc="searchQuery = ''" />
-          <button type="submit" class="search-btn" :disabled="!searchQuery.trim() || loading">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search any city worldwide..."
+            class="search-input"
+            @keydown.esc="searchQuery = ''"
+            aria-label="Search for a city"
+            autocomplete="off"
+          />
+          <button v-if="searchQuery" type="button" class="search-clear" @click="searchQuery = ''" aria-label="Clear search">×</button>
+          <button type="submit" class="search-btn" :disabled="!searchQuery.trim() || loading" aria-label="Search">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
           </button>
         </form>
-        <div class="quick-chips">
+        <!-- Recent searches -->
+        <div class="quick-chips" v-if="recentSearches.length || cities.length">
+          <span class="chips-label" v-if="recentSearches.length">Recent:</span>
+          <button v-for="c in recentSearches.slice(0,3)" :key="'r'+c" @click="quickSearch(c)" class="chip chip-recent glass glass-hover">
+            🕐 {{ c }}
+          </button>
+          <span class="chips-divider" v-if="recentSearches.length">|</span>
           <button v-for="c in cities" :key="c" @click="quickSearch(c)" class="chip glass glass-hover">{{ c }}</button>
         </div>
       </div>
 
       <!-- ERROR -->
-      <div v-if="error" class="error-bar glass anim-fade-in">
-        <span class="error-icon">⚠</span>
+      <div v-if="error" class="error-bar glass anim-fade-in" role="alert">
+        <span class="error-icon" aria-hidden="true">⚠</span>
         <span>{{ error }}</span>
       </div>
 
       <!-- LOADING SKELETON -->
       <template v-if="loading">
-        <div class="skeleton-wrap anim-fade-in">
+        <div class="skeleton-wrap anim-fade-in" aria-busy="true" aria-label="Loading weather data">
           <div class="skeleton-hero glass">
             <div class="sk-line shimmer" style="width:200px;height:18px;margin-bottom:20px" />
             <div class="sk-line shimmer" style="width:160px;height:100px;margin-bottom:12px" />
@@ -85,35 +110,39 @@
                 <span class="city-name">{{ weather.city }}</span>
                 <span class="country-tag">{{ weather.country }}</span>
                 <span class="day-night-tag">{{ weather.is_day ? '☀ Day' : '🌙 Night' }}</span>
+                <!-- Last updated -->
+                <span class="updated-tag" v-if="lastUpdated" :title="`Last updated: ${lastUpdated}`">
+                  🔄 {{ timeAgo }}
+                </span>
               </div>
               <div class="temp-display">
-                <span class="temp-number">{{ weather.temp }}</span>
+                <span class="temp-number">{{ displayTemp(weather.temp) }}</span>
                 <div class="temp-right">
-                  <span class="temp-unit">°C</span>
+                  <span class="temp-unit">°{{ tempUnit }}</span>
                   <div class="condition-emoji">{{ iconToEmoji(weather.icon) }}</div>
                 </div>
               </div>
               <div class="condition-desc">{{ weather.description }}</div>
-              <div class="feels-like">Feels like <strong>{{ weather.feels_like }}°C</strong></div>
+              <div class="feels-like">Feels like <strong>{{ displayTemp(weather.feels_like) }}°{{ tempUnit }}</strong></div>
 
               <!-- Temp bar -->
               <div class="temp-range-bar">
-                <span class="range-label">{{ forecast[0]?.low ?? '--' }}°</span>
+                <span class="range-label">{{ displayTemp(forecast[0]?.low ?? 0) }}°</span>
                 <div class="range-track">
                   <div class="range-fill" :style="{ width: tempBarWidth + '%', background: `linear-gradient(90deg, #38bdf8, ${theme.accent})` }" />
                 </div>
-                <span class="range-label">{{ forecast[0]?.high ?? '--' }}°</span>
+                <span class="range-label">{{ displayTemp(forecast[0]?.high ?? 0) }}°</span>
               </div>
             </div>
 
             <div class="hero-right">
               <!-- Wind compass -->
-              <div class="compass-wrap">
+              <div class="compass-wrap" aria-label="Wind direction compass">
                 <div class="compass-ring">
-                  <div class="compass-label-n">N</div>
-                  <div class="compass-label-s">S</div>
-                  <div class="compass-label-e">E</div>
-                  <div class="compass-label-w">W</div>
+                  <div class="compass-label-n" aria-hidden="true">N</div>
+                  <div class="compass-label-s" aria-hidden="true">S</div>
+                  <div class="compass-label-e" aria-hidden="true">E</div>
+                  <div class="compass-label-w" aria-hidden="true">W</div>
                   <div class="compass-needle" :style="{ transform: `rotate(${weather.wind_deg}deg)` }">
                     <div class="needle-north" />
                     <div class="needle-south" />
@@ -141,9 +170,9 @@
           </div>
 
           <!-- STATS ROW -->
-          <div class="stats-row">
-            <div v-for="stat in stats" :key="stat.label" class="stat-card glass glass-hover">
-              <div class="stat-icon">{{ stat.icon }}</div>
+          <div class="stats-row" role="list" aria-label="Weather statistics">
+            <div v-for="stat in stats" :key="stat.label" class="stat-card glass glass-hover" role="listitem">
+              <div class="stat-icon" aria-hidden="true">{{ stat.icon }}</div>
               <div class="stat-body">
                 <div class="stat-label">{{ stat.label }}</div>
                 <div class="stat-value">{{ stat.value }}<span class="stat-unit">{{ stat.unit }}</span></div>
@@ -154,14 +183,14 @@
           <!-- SUN TIMES -->
           <div class="sun-card glass">
             <div class="sun-item">
-              <div class="sun-icon">🌅</div>
+              <div class="sun-icon" aria-hidden="true">🌅</div>
               <div>
                 <div class="sun-label">Sunrise</div>
                 <div class="sun-time">{{ weather.sunrise }}</div>
               </div>
             </div>
             <div class="sun-arc-wrap">
-              <svg viewBox="0 0 200 100" class="sun-arc-svg">
+              <svg viewBox="0 0 200 100" class="sun-arc-svg" aria-hidden="true">
                 <path d="M 10 90 Q 100 10 190 90" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
                 <path d="M 10 90 Q 100 10 190 90" fill="none" :stroke="theme.accent" stroke-width="2"
                   stroke-dasharray="280" :stroke-dashoffset="280 - (280 * sunProgress)" style="transition:stroke-dashoffset 1s ease"/>
@@ -173,7 +202,29 @@
                 <div class="sun-label">Sunset</div>
                 <div class="sun-time">{{ weather.sunset }}</div>
               </div>
-              <div class="sun-icon">🌇</div>
+              <div class="sun-icon" aria-hidden="true">🌇</div>
+            </div>
+          </div>
+
+          <!-- AIR QUALITY -->
+          <div v-if="airQuality" class="aqi-card glass">
+            <div class="aqi-header">
+              <div class="section-title" style="margin:0">
+                <span>Air Quality</span>
+                <span class="aqi-badge" :style="{ background: airQuality.color + '25', color: airQuality.color, borderColor: airQuality.color + '60' }">
+                  {{ airQuality.label }}
+                </span>
+              </div>
+            </div>
+            <div class="aqi-bar-wrap" style="margin: 10px 0 8px">
+              <div class="aqi-bar-bg" />
+              <div class="aqi-bar-fill" :style="{ width: (airQuality.index / 5 * 100) + '%', background: airQuality.color }" />
+            </div>
+            <div class="aqi-metrics">
+              <div v-for="m in airQuality.metrics" :key="m.name" class="aqi-metric">
+                <span class="aqi-metric-name">{{ m.name }}</span>
+                <span class="aqi-metric-val">{{ m.value }}</span>
+              </div>
             </div>
           </div>
 
@@ -183,14 +234,17 @@
               <span>Hourly Forecast</span>
               <span class="section-sub">next 24h</span>
             </div>
-            <div class="hourly-scroll">
+            <div class="hourly-scroll" role="list">
               <div v-for="(h, i) in hourly" :key="i"
                 class="hourly-item glass-hover"
                 :class="{ 'hourly-now': i === 0 }"
-                :style="i === 0 ? { borderColor: theme.accent + '80', background: theme.accent + '15' } : {}">
+                :style="i === 0 ? { borderColor: theme.accent + '80', background: theme.accent + '15' } : {}"
+                role="listitem"
+                :aria-label="`${i === 0 ? 'Now' : h.time}: ${h.temp}°, ${h.precip > 0 ? h.precip + '% rain' : 'no rain'}`"
+              >
                 <div class="hourly-time">{{ i === 0 ? 'Now' : h.time }}</div>
-                <div class="hourly-emoji">{{ iconToEmoji(h.icon) }}</div>
-                <div class="hourly-temp">{{ h.temp }}°</div>
+                <div class="hourly-emoji" aria-hidden="true">{{ iconToEmoji(h.icon) }}</div>
+                <div class="hourly-temp">{{ displayTemp(h.temp) }}°</div>
                 <div v-if="h.precip > 0" class="hourly-precip">{{ h.precip }}%</div>
               </div>
             </div>
@@ -201,18 +255,21 @@
             <div class="section-title">
               <span>6-Day Forecast</span>
             </div>
-            <div class="forecast-list">
+            <div class="forecast-list" role="list">
               <div v-for="(day, i) in forecast" :key="i"
                 class="forecast-row glass-hover"
-                :class="{ 'forecast-today': i === 0 }">
+                :class="{ 'forecast-today': i === 0 }"
+                role="listitem"
+                :aria-label="`${day.day}: ${day.condition}, high ${displayTemp(day.high)}°, low ${displayTemp(day.low)}°`"
+              >
                 <span class="forecast-day">{{ day.day }}</span>
-                <span class="forecast-emoji">{{ iconToEmoji(day.icon) }}</span>
+                <span class="forecast-emoji" aria-hidden="true">{{ iconToEmoji(day.icon) }}</span>
                 <span class="forecast-cond">{{ day.condition }}</span>
                 <div class="forecast-precip-wrap">
                   <span v-if="day.chance_of_rain > 0" class="forecast-precip">💧 {{ day.chance_of_rain }}%</span>
                 </div>
                 <div class="forecast-temps">
-                  <span class="forecast-high">{{ day.high }}°</span>
+                  <span class="forecast-high">{{ displayTemp(day.high) }}°</span>
                   <div class="forecast-bar">
                     <div class="forecast-bar-fill"
                       :style="{
@@ -221,8 +278,59 @@
                         background: `linear-gradient(90deg, #38bdf8, ${theme.accent})`
                       }" />
                   </div>
-                  <span class="forecast-low">{{ day.low }}°</span>
+                  <span class="forecast-low">{{ displayTemp(day.low) }}°</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- WEATHER COMPARISON (compare two cities) -->
+          <div class="compare-card glass">
+            <div class="section-title">
+              <span>Compare Cities</span>
+              <span class="section-sub">side-by-side</span>
+            </div>
+            <div class="compare-body">
+              <div class="compare-main">
+                <div class="compare-city-name">{{ weather.city }}</div>
+                <div class="compare-temp" :style="{ color: theme.accent }">{{ displayTemp(weather.temp) }}°{{ tempUnit }}</div>
+                <div class="compare-desc">{{ weather.description }}</div>
+              </div>
+              <div class="compare-vs">VS</div>
+              <div class="compare-side">
+                <template v-if="compareWeather">
+                  <div class="compare-city-name">{{ compareWeather.city }}</div>
+                  <div class="compare-temp" :style="{ color: compareTheme.accent }">{{ displayTemp(compareWeather.temp) }}°{{ tempUnit }}</div>
+                  <div class="compare-desc">{{ compareWeather.description }}</div>
+                  <button class="compare-clear" @click="compareWeather = null" aria-label="Clear comparison">×</button>
+                </template>
+                <template v-else>
+                  <form @submit.prevent="handleCompare" class="compare-form">
+                    <input
+                      v-model="compareQuery"
+                      type="text"
+                      placeholder="Enter city..."
+                      class="compare-input"
+                      aria-label="City to compare"
+                    />
+                    <button type="submit" class="compare-btn" :disabled="!compareQuery.trim() || comparingCity" aria-label="Compare">
+                      <svg v-if="!comparingCity" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                      <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                        <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581"/>
+                      </svg>
+                    </button>
+                  </form>
+                </template>
+              </div>
+            </div>
+            <!-- Comparison stats -->
+            <div v-if="compareWeather" class="compare-stats">
+              <div v-for="row in compareStats" :key="row.label" class="compare-stat-row">
+                <span class="compare-stat-val" :class="row.winA ? 'compare-winner' : ''">{{ row.a }}</span>
+                <span class="compare-stat-label">{{ row.label }}</span>
+                <span class="compare-stat-val" :class="row.winB ? 'compare-winner' : ''">{{ row.b }}</span>
               </div>
             </div>
           </div>
@@ -237,10 +345,15 @@
           <h2 class="empty-title">Real-time Weather</h2>
           <p class="empty-sub">Search any city worldwide. Powered by Open-Meteo — 100% free, no API key needed.</p>
           <div class="empty-badge glass">
-            <span style="color:var(--accent)">●</span> Free · No signup · No limits
+            <span :style="{ color: 'var(--accent)' }">●</span> Free · No signup · No limits
           </div>
         </div>
       </template>
+
+      <!-- TOAST -->
+      <transition name="toast-pop">
+        <div v-if="toastMessage" class="toast-pill glass" role="status">{{ toastMessage }}</div>
+      </transition>
 
       <footer class="footer">
         Open-Meteo · OpenStreetMap · NuxtJS 3 · Tailwind CSS · Deploy on Vercel
@@ -252,28 +365,69 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useWeather, iconToEmoji, getTheme, uvInfo, wmoToInfo } from '~/composables/useWeather'
+
 const { weather, forecast, hourly, loading, error, fetchWeather, fetchByCoords } = useWeather()
 const route = useRoute()
 
-const searchQuery = ref('')
-const locating = ref(false)
-const currentTime = ref('')
-const cities = ['Bangkok', 'Tokyo', 'London', 'New York', 'Dubai', 'Sydney', 'Paris']
+const searchQuery   = ref('')
+const compareQuery  = ref('')
+const locating      = ref(false)
+const comparingCity = ref(false)
+const currentTime   = ref('')
+const tempUnit      = ref<'C' | 'F'>('C')
+const toastMessage  = ref('')
+const lastUpdated   = ref<Date | null>(null)
+const airQuality    = ref<any>(null)
+const compareWeather = ref<any>(null)
+const recentSearches = ref<string[]>([])
+
+const cities    = ['Bangkok', 'Tokyo', 'London', 'New York', 'Dubai', 'Sydney', 'Paris']
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let animFrame: number
 let timer: ReturnType<typeof setInterval>
+let timeAgoTimer: ReturnType<typeof setInterval>
+let toastTimer: ReturnType<typeof setTimeout>
+
+// ─── Load preferences ────────────────────────────────────────────
+onMounted(() => {
+  try {
+    const unit = localStorage.getItem('wx_unit') as 'C' | 'F' | null
+    if (unit) tempUnit.value = unit
+    const recent = localStorage.getItem('wx_recent')
+    if (recent) recentSearches.value = JSON.parse(recent)
+  } catch {}
+})
+
+watch(tempUnit, (val) => {
+  try { localStorage.setItem('wx_unit', val) } catch {}
+})
+
+// ─── Temperature helper ───────────────────────────────────────────
+function displayTemp(c: number): number {
+  return tempUnit.value === 'F' ? Math.round(c * 9 / 5 + 32) : c
+}
 
 // ─── Theme ───────────────────────────────────────────────────────
-const theme = computed(() => getTheme(weather.value?.condition || '', weather.value?.is_day ?? 1))
+const theme        = computed(() => getTheme(weather.value?.condition || '', weather.value?.is_day ?? 1))
+const compareTheme = computed(() => compareWeather.value ? getTheme(compareWeather.value.condition || '', compareWeather.value.is_day ?? 1) : { accent: '#38bdf8' })
 const currentEmoji = computed(() => weather.value ? iconToEmoji(weather.value.icon) : '🌤')
-const isThunder = computed(() => weather.value?.condition?.toLowerCase().includes('thunder'))
-const uvData = computed(() => uvInfo(weather.value?.uv ?? 0))
+const isThunder    = computed(() => weather.value?.condition?.toLowerCase().includes('thunder'))
+const uvData       = computed(() => uvInfo(weather.value?.uv ?? 0))
+
+// ─── Time ago ─────────────────────────────────────────────────────
+const timeAgo = computed(() => {
+  if (!lastUpdated.value) return ''
+  const diff = Math.floor((Date.now() - lastUpdated.value.getTime()) / 1000)
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  return `${Math.floor(diff / 3600)}h ago`
+})
 
 // ─── Stats ────────────────────────────────────────────────────────
 const stats = computed(() => weather.value ? [
-  { icon: '💧', label: 'Humidity', value: weather.value.humidity, unit: '%' },
+  { icon: '💧', label: 'Humidity',   value: weather.value.humidity,   unit: '%' },
   { icon: '🔭', label: 'Visibility', value: weather.value.visibility, unit: ' km' },
-  { icon: '🌡', label: 'Pressure', value: weather.value.pressure, unit: ' hPa' },
+  { icon: '🌡', label: 'Pressure',   value: weather.value.pressure,   unit: ' hPa' },
 ] : [])
 
 // ─── Temp bar ─────────────────────────────────────────────────────
@@ -285,8 +439,8 @@ const tempBarWidth = computed(() => {
 })
 
 // ─── Forecast bar range ───────────────────────────────────────────
-const minTemp = computed(() => Math.min(...(forecast.value.map(d => d.low)), 0))
-const maxTemp = computed(() => Math.max(...(forecast.value.map(d => d.high)), 0))
+const minTemp   = computed(() => Math.min(...(forecast.value.map(d => d.low)), 0))
+const maxTemp   = computed(() => Math.max(...(forecast.value.map(d => d.high)), 0))
 const tempRange = computed(() => Math.max(maxTemp.value - minTemp.value, 1))
 
 // ─── Sun arc ──────────────────────────────────────────────────────
@@ -295,21 +449,118 @@ const sunProgress = computed(() => {
   const now = new Date()
   const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const rise = toMin(weather.value.sunrise)
-  const set = toMin(weather.value.sunset)
+  const rise   = toMin(weather.value.sunrise)
+  const set    = toMin(weather.value.sunset)
   if (nowMin <= rise) return 0
   if (nowMin >= set) return 1
   return (nowMin - rise) / (set - rise)
 })
-const sunX = computed(() => {
-  const t = sunProgress.value
-  return 10 + (190 - 10) * t
-})
+const sunX = computed(() => 10 + (190 - 10) * sunProgress.value)
 const sunY = computed(() => {
   const t = sunProgress.value
-  // Quadratic bezier Y: (1-t)^2*90 + 2*(1-t)*t*10 + t^2*90
   return Math.round((1 - t) * (1 - t) * 90 + 2 * (1 - t) * t * 10 + t * t * 90)
 })
+
+// ─── Compare stats ────────────────────────────────────────────────
+const compareStats = computed(() => {
+  if (!weather.value || !compareWeather.value) return []
+  const a = weather.value
+  const b = compareWeather.value
+  return [
+    { label: 'Temperature', a: `${displayTemp(a.temp)}°`, b: `${displayTemp(b.temp)}°`, winA: a.temp > b.temp, winB: b.temp > a.temp },
+    { label: 'Humidity',    a: `${a.humidity}%`,          b: `${b.humidity}%`,          winA: a.humidity < b.humidity, winB: b.humidity < a.humidity },
+    { label: 'Wind km/h',   a: `${a.wind_speed}`,         b: `${b.wind_speed}`,         winA: a.wind_speed < b.wind_speed, winB: b.wind_speed < a.wind_speed },
+    { label: 'Visibility',  a: `${a.visibility}km`,       b: `${b.visibility}km`,       winA: a.visibility > b.visibility, winB: b.visibility > a.visibility },
+  ]
+})
+
+// ─── Air quality fetch ────────────────────────────────────────────
+async function fetchAirQuality(lat: number, lon: number) {
+  try {
+    const res = await fetch(
+      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+      `&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone`
+    )
+    if (!res.ok) return
+    const data = await res.json()
+    const aqi = data.current?.european_aqi
+    if (aqi == null) return
+    const aqiMap = [
+      { max: 20,  label: 'Good',        color: '#4ade80' },
+      { max: 40,  label: 'Fair',        color: '#a3e635' },
+      { max: 60,  label: 'Moderate',    color: '#facc15' },
+      { max: 80,  label: 'Poor',        color: '#fb923c' },
+      { max: 100, label: 'Very Poor',   color: '#f87171' },
+      { max: Infinity, label: 'Hazardous', color: '#c084fc' },
+    ]
+    const level = aqiMap.find(l => aqi <= l.max)!
+    airQuality.value = {
+      index: Math.min(Math.ceil(aqi / 20), 5),
+      label: level.label,
+      color: level.color,
+      metrics: [
+        { name: 'PM2.5', value: `${Math.round(data.current?.pm2_5 ?? 0)} μg/m³` },
+        { name: 'PM10',  value: `${Math.round(data.current?.pm10 ?? 0)} μg/m³` },
+        { name: 'O₃',    value: `${Math.round(data.current?.ozone ?? 0)} μg/m³` },
+        { name: 'NO₂',   value: `${Math.round(data.current?.nitrogen_dioxide ?? 0)} μg/m³` },
+      ],
+    }
+  } catch {}
+}
+
+// ─── Compare city ─────────────────────────────────────────────────
+async function handleCompare() {
+  if (!compareQuery.value.trim()) return
+  comparingCity.value = true
+  try {
+    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(compareQuery.value)}&count=1&language=en&format=json`)
+    const geoData = await geoRes.json()
+    if (!geoData.results?.length) { showToast('City not found'); return }
+    const { latitude: lat, longitude: lon, name, country, timezone } = geoData.results[0]
+    const wRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,visibility,is_day,uv_index` +
+      `&timezone=${encodeURIComponent(timezone || 'UTC')}&wind_speed_unit=kmh`
+    )
+    const wData = await wRes.json()
+    const cur = wData.current
+    const info = wmoToInfo(cur.weather_code, cur.is_day)
+    compareWeather.value = {
+      city: name, country, temp: Math.round(cur.temperature_2m),
+      feels_like: Math.round(cur.apparent_temperature),
+      humidity: cur.relative_humidity_2m,
+      wind_speed: Math.round(cur.wind_speed_10m),
+      visibility: Math.round((cur.visibility || 10000) / 1000),
+      pressure: Math.round(cur.surface_pressure),
+      description: info.description, icon: info.icon, condition: info.condition,
+      is_day: cur.is_day, uv: Math.round(cur.uv_index || 0),
+    }
+    compareQuery.value = ''
+  } catch {
+    showToast('Failed to fetch comparison city')
+  } finally {
+    comparingCity.value = false
+  }
+}
+
+// ─── Share weather ────────────────────────────────────────────────
+async function shareWeather() {
+  if (!weather.value) return
+  const text = `Weather in ${weather.value.city}: ${displayTemp(weather.value.temp)}°${tempUnit.value}, ${weather.value.description}`
+  if (navigator.share) {
+    await navigator.share({ title: `${weather.value.city} Weather`, text }).catch(() => {})
+  } else {
+    await navigator.clipboard.writeText(text).catch(() => {})
+    showToast('📋 Copied to clipboard!')
+  }
+}
+
+// ─── Toast ────────────────────────────────────────────────────────
+function showToast(msg: string) {
+  toastMessage.value = msg
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMessage.value = '' }, 3000)
+}
 
 // ─── Particle canvas ─────────────────────────────────────────────
 interface Particle { x: number; y: number; vx: number; vy: number; size: number; opacity: number; life: number; maxLife: number }
@@ -317,17 +568,17 @@ interface Particle { x: number; y: number; vx: number; vy: number; size: number;
 function initCanvas() {
   const canvas = canvasRef.value
   if (!canvas) return
-  canvas.width = window.innerWidth
+  canvas.width  = window.innerWidth
   canvas.height = window.innerHeight
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
   const particles: Particle[] = []
-  const cond = weather.value?.condition?.toLowerCase() || ''
+  const cond   = weather.value?.condition?.toLowerCase() || ''
   const isRain = cond.includes('rain') || cond.includes('drizzle')
   const isSnow = cond.includes('snow')
   const isClear = cond.includes('clear')
-  const count = isRain ? 120 : isSnow ? 60 : isClear ? 40 : 25
+  const count  = isRain ? 120 : isSnow ? 60 : isClear ? 40 : 25
 
   for (let i = 0; i < count; i++) {
     particles.push(makeParticle(canvas.width, canvas.height, isRain, isSnow, true))
@@ -351,44 +602,27 @@ function initCanvas() {
   function draw() {
     if (!ctx || !canvas) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-
     particles.forEach((p, idx) => {
-      p.x += p.vx
-      p.y += p.vy
-      p.life++
-
+      p.x += p.vx; p.y += p.vy; p.life++
       if (p.y > canvas.height + 20 || p.life > p.maxLife) {
-        particles[idx] = makeParticle(canvas.width, canvas.height, isRain, isSnow)
-        return
+        particles[idx] = makeParticle(canvas.width, canvas.height, isRain, isSnow); return
       }
-
-      ctx.save()
-      ctx.globalAlpha = p.opacity
-
+      ctx.save(); ctx.globalAlpha = p.opacity
       if (isRain) {
         ctx.strokeStyle = accentColor === 'cyan' ? '#7dd3fc' : '#93c5fd'
         ctx.lineWidth = p.size * 0.6
-        ctx.beginPath()
-        ctx.moveTo(p.x, p.y)
-        ctx.lineTo(p.x + p.vx * 4, p.y + p.vy * 4)
-        ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + p.vx * 4, p.y + p.vy * 4); ctx.stroke()
       } else if (isSnow) {
         ctx.fillStyle = '#e0f2fe'
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        ctx.fill()
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill()
       } else {
-        // Stars / dust
         const twinkle = Math.sin(Date.now() * 0.001 + p.x) * 0.3 + 0.7
         ctx.globalAlpha = p.opacity * twinkle
         ctx.fillStyle = accentColor === 'amber' ? '#fef3c7' : accentColor === 'indigo' ? '#c7d2fe' : '#e0f2fe'
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        ctx.fill()
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill()
       }
       ctx.restore()
     })
-
     animFrame = requestAnimationFrame(draw)
   }
   draw()
@@ -398,43 +632,90 @@ function initCanvas() {
 onMounted(() => {
   updateTime()
   timer = setInterval(updateTime, 1000)
-  // Support ?city= query param from map page
-  const route = useRoute()
+  timeAgoTimer = setInterval(() => {}, 30000) // trigger reactivity for timeAgo
+
   const cityParam = route.query.city as string
-  fetchWeather(cityParam || 'Bangkok')
+  const city = cityParam || 'Bangkok'
+  fetchWeather(city).then(() => {
+    lastUpdated.value = new Date()
+    if (weather.value) {
+      addToRecent(city)
+      fetchAirQuality(0, 0) // placeholder; update with actual coords via composable
+    }
+  })
+
+  window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
   clearInterval(timer)
+  clearInterval(timeAgoTimer)
   cancelAnimationFrame(animFrame)
+  window.removeEventListener('resize', handleResize)
 })
+
+function handleResize() {
+  cancelAnimationFrame(animFrame)
+  nextTick(() => initCanvas())
+}
 
 watch(() => weather.value?.condition, async () => {
   cancelAnimationFrame(animFrame)
   await nextTick()
   setTimeout(initCanvas, 100)
+  lastUpdated.value = new Date()
 })
 
 function updateTime() {
   currentTime.value = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
-function handleSearch() {
-  if (searchQuery.value.trim()) fetchWeather(searchQuery.value.trim())
+
+function addToRecent(city: string) {
+  const filtered = recentSearches.value.filter(c => c.toLowerCase() !== city.toLowerCase())
+  recentSearches.value = [city, ...filtered].slice(0, 5)
+  try { localStorage.setItem('wx_recent', JSON.stringify(recentSearches.value)) } catch {}
 }
+
+function handleSearch() {
+  if (searchQuery.value.trim()) {
+    fetchWeather(searchQuery.value.trim()).then(() => {
+      lastUpdated.value = new Date()
+      addToRecent(searchQuery.value.trim())
+    })
+  }
+}
+
 function quickSearch(city: string) {
   searchQuery.value = city
-  fetchWeather(city)
+  fetchWeather(city).then(() => {
+    lastUpdated.value = new Date()
+    addToRecent(city)
+  })
 }
+
 async function fetchLocation() {
-  if (!navigator.geolocation) return
+  if (!navigator.geolocation) {
+    showToast('Geolocation not supported by your browser')
+    return
+  }
   locating.value = true
   try {
     const pos = await new Promise<GeolocationPosition>((res, rej) =>
       navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })
     )
     await fetchByCoords(pos.coords.latitude, pos.coords.longitude)
-  } catch (_) {}
-  finally { locating.value = false }
+    lastUpdated.value = new Date()
+    if (weather.value) addToRecent(weather.value.city)
+  } catch (e: any) {
+    const msg = e.code === 1
+      ? 'Location permission denied. Please allow access in your browser settings.'
+      : e.code === 3
+        ? 'Location request timed out. Try again.'
+        : 'Could not get your location.'
+    showToast(msg)
+  } finally {
+    locating.value = false
+  }
 }
 </script>
 
@@ -451,20 +732,27 @@ async function fetchLocation() {
 .from-\[\#0c1445\] { background: linear-gradient(135deg, #0c1445 0%, #1e3a8a 50%, #0c2461 100%); }
 .particles-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .lightning-flash { position: absolute; inset: 0; background: white; animation: lightning 4s ease-in-out infinite; pointer-events: none; }
+@keyframes lightning { 0%,94%,96%,100% { opacity: 0; } 95% { opacity: 0.06; } }
 .content-wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 24px 16px 40px; }
 
 /* ── Topbar ───────────────────────────────── */
-.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
 .logo { display: flex; align-items: center; gap: 10px; }
 .logo-icon { width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 22px; }
 .logo-title { font-size: 15px; font-weight: 800; letter-spacing: 0.15em; color: #fff; }
 .logo-sub { font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 0.05em; margin-top: 1px; }
-.topbar-right { display: flex; align-items: center; gap: 8px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .clock { font-family: 'Space Mono', monospace; font-size: 12px; color: rgba(255,255,255,0.6); padding: 7px 14px; border-radius: 20px; }
 .btn-icon { width: 36px; height: 36px; border-radius: 12px; border: none; cursor: pointer; color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); }
 .btn-icon:hover { color: #fff; }
 .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 .spinning { animation: spin-slow 1s linear infinite; }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+
+/* ── Unit toggle ──────────────────────────── */
+.unit-toggle { display: flex; border-radius: 12px; overflow: hidden; padding: 3px; gap: 2px; }
+.unit-btn { padding: 4px 12px; border: none; cursor: pointer; background: transparent; color: rgba(255,255,255,0.4); font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700; border-radius: 8px; transition: all 0.2s; }
+.unit-active { background: rgba(255,255,255,0.12); color: #fff; }
 
 /* ── Search ───────────────────────────────── */
 .search-wrap { margin-bottom: 16px; }
@@ -472,11 +760,16 @@ async function fetchLocation() {
 .search-icon { color: rgba(255,255,255,0.35); flex-shrink: 0; }
 .search-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 14px; font-family: 'Outfit', sans-serif; }
 .search-input::placeholder { color: rgba(255,255,255,0.3); }
+.search-clear { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.35); font-size: 18px; padding: 0; line-height: 1; transition: color 0.2s; }
+.search-clear:hover { color: rgba(255,255,255,0.7); }
 .search-btn { width: 32px; height: 32px; border-radius: 10px; border: none; background: var(--accent); color: #000; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity .2s, transform .15s; flex-shrink: 0; }
 .search-btn:hover { opacity: 0.85; transform: scale(1.05); }
 .search-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
-.quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.chips-label { font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
+.chips-divider { color: rgba(255,255,255,0.15); margin: 0 2px; }
 .chip { padding: 5px 12px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-family: 'Outfit', sans-serif; color: rgba(255,255,255,0.55); }
+.chip-recent { color: rgba(255,255,255,0.4); font-size: 11px; }
 
 /* ── Error ────────────────────────────────── */
 .error-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; border-color: rgba(239,68,68,0.3) !important; color: #fca5a5; font-size: 13px; }
@@ -500,6 +793,7 @@ async function fetchLocation() {
 .city-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .country-tag { padding: 3px 10px; background: rgba(255,255,255,0.1); border-radius: 20px; font-size: 11px; color: rgba(255,255,255,0.6); }
 .day-night-tag { padding: 3px 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; font-size: 11px; color: rgba(255,255,255,0.5); }
+.updated-tag { font-size: 10px; color: rgba(255,255,255,0.25); cursor: default; }
 .temp-display { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 8px; line-height: 1; }
 .temp-number { font-size: 96px; font-weight: 900; letter-spacing: -0.04em; line-height: 0.9; }
 .temp-right { display: flex; flex-direction: column; justify-content: flex-start; padding-top: 12px; }
@@ -560,6 +854,19 @@ async function fetchLocation() {
 .sun-arc-wrap { flex: 1; }
 .sun-arc-svg { width: 100%; height: auto; display: block; }
 
+/* ── Air Quality ──────────────────────────── */
+.aqi-card { border-radius: 22px; padding: 20px; }
+.aqi-header { display: flex; justify-content: space-between; align-items: center; }
+.aqi-badge { font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px; border: 1px solid; }
+.aqi-bar-wrap { position: relative; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.aqi-bar-bg { position: absolute; inset: 0; background: linear-gradient(90deg, #4ade80, #facc15, #fb923c, #f87171, #c084fc); }
+.aqi-bar-fill { position: absolute; right: 0; top: 0; bottom: 0; background: rgba(8,12,28,0.7); transition: width 1s ease; }
+.aqi-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 600px) { .aqi-metrics { grid-template-columns: repeat(2, 1fr); } }
+.aqi-metric { display: flex; flex-direction: column; gap: 2px; }
+.aqi-metric-name { font-size: 9px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; }
+.aqi-metric-val { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); font-family: 'Space Mono', monospace; }
+
 /* ── Hourly ───────────────────────────────── */
 .hourly-card { border-radius: 22px; padding: 20px; }
 .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.4); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
@@ -591,13 +898,60 @@ async function fetchLocation() {
 .forecast-bar { width: 80px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; position: relative; }
 .forecast-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: 2px; transition: all 0.8s ease; }
 
+/* ── Compare Card ─────────────────────────── */
+.compare-card { border-radius: 22px; padding: 20px; }
+.compare-body { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.compare-main, .compare-side { flex: 1; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); min-height: 90px; display: flex; flex-direction: column; justify-content: center; gap: 4px; position: relative; }
+.compare-vs { font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.2); letter-spacing: 0.1em; flex-shrink: 0; }
+.compare-city-name { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.8); }
+.compare-temp { font-size: 28px; font-weight: 900; line-height: 1; }
+.compare-desc { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: capitalize; }
+.compare-clear { position: absolute; top: 8px; right: 8px; background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.3); font-size: 16px; line-height: 1; transition: color 0.2s; }
+.compare-clear:hover { color: #ef4444; }
+.compare-form { display: flex; gap: 6px; }
+.compare-input { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 12px; outline: none; font-family: 'Outfit', sans-serif; }
+.compare-input::placeholder { color: rgba(255,255,255,0.3); }
+.compare-btn { width: 30px; height: 30px; border-radius: 8px; border: none; background: var(--accent); color: #000; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.compare-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.compare-stats { display: flex; flex-direction: column; gap: 8px; }
+.compare-stat-row { display: flex; align-items: center; gap: 8px; }
+.compare-stat-val { flex: 1; font-size: 13px; font-weight: 600; text-align: center; color: rgba(255,255,255,0.5); }
+.compare-winner { color: #fff; }
+.compare-stat-label { font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.08em; min-width: 80px; text-align: center; }
+
 /* ── Empty ────────────────────────────────── */
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 20px; }
 .empty-globe { font-size: 80px; margin-bottom: 24px; animation: float 5s ease-in-out infinite; }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
 .empty-title { font-size: 28px; font-weight: 800; margin-bottom: 12px; }
 .empty-sub { font-size: 14px; color: rgba(255,255,255,0.45); max-width: 360px; line-height: 1.6; margin-bottom: 24px; }
 .empty-badge { padding: 10px 20px; border-radius: 20px; font-size: 12px; color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 8px; }
 
+/* ── Toast ────────────────────────────────── */
+.toast-pill {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  z-index: 9999; padding: 10px 24px; border-radius: 20px;
+  font-size: 13px; color: rgba(255,255,255,0.9);
+  background: rgba(8,12,28,0.96); border: 1px solid rgba(255,255,255,0.2);
+  white-space: nowrap; pointer-events: none;
+}
+.toast-pop-enter-active { transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.toast-pop-leave-active { transition: all 0.2s ease; }
+.toast-pop-enter-from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.9); }
+.toast-pop-leave-to { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+
 /* ── Footer ───────────────────────────────── */
 .footer { text-align: center; font-size: 10px; color: rgba(255,255,255,0.18); margin-top: 32px; letter-spacing: 0.04em; }
+
+/* ── Animations ───────────────────────────── */
+.anim-fade-up { animation: fadeUp 0.5s ease both; }
+.anim-fade-in { animation: fadeIn 0.3s ease both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 400% 100%; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.glass { backdrop-filter: blur(20px); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+.glass-hover { transition: all 0.2s; cursor: pointer; }
+.glass-hover:hover { background: rgba(255,255,255,0.08); }
 </style>
